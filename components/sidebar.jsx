@@ -1,13 +1,11 @@
 "use client"
 
-import type React from "react"
-
 import { BookOpen, Menu, Lightbulb, Users, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useState } from "react"
 
-export default function Sidebar({ onClose }: { onClose?: () => void }) {
+export default function Sidebar({ onClose }) {
   const router = useRouter()
   const pathname = usePathname()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -18,11 +16,19 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
   const confirmLogout = () => {
     setShowLogoutConfirm(false)
-    console.log("User logged out")
-    // Add actual logout logic here
+    // perform sign out and redirect to /login
+    try {
+      ;(async () => {
+        const { signOutUser } = await import("@/lib/firebase")
+        await signOutUser()
+        router.push("/login")
+      })()
+    } catch (err) {
+      console.error("Logout failed", err)
+    }
   }
 
-  const isActive = (href: string) => {
+  const isActive = (href) => {
     return pathname === href || pathname.startsWith(href + "/")
   }
 
@@ -92,15 +98,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   )
 }
 
-interface NavItemProps {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  href: string
-  active?: boolean
-  onClick?: () => void
-}
-
-function NavItem({ icon: Icon, label, href, active = false, onClick }: NavItemProps) {
+function NavItem({ icon: Icon, label, href, active = false, onClick }) {
   return (
     <Link
       href={href}

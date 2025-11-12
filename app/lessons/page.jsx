@@ -1,25 +1,24 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Search, Menu, X, Plus } from "lucide-react"
 import Sidebar from "@/components/sidebar"
 import PagesList from "@/components/pages-list"
 import PageEditor from "@/components/page-editor"
+import { subscribeCollection, addDocument, deleteDocument, swapOrder } from "@/lib/firebase"
 
 export default function LessonsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedPage, setSelectedPage] = useState<any>(null)
-  const [pages, setPages] = useState([
-    { id: 1, order: 1, title: "Animation", type: "ANIMATION", badge: "Animation" },
-    { id: 2, order: 2, title: "Practice_guided", type: "PRACTICE", badge: "Practice_guided" },
-    { id: 3, order: 3, title: "Practice", type: "PRACTICE", badge: "Practice" },
-    { id: 4, order: 4, title: "Illustration", type: "INFO", badge: "Illustration" },
-    { id: 5, order: 5, title: "Practice_guided", type: "PRACTICE", badge: "Practice_guided" },
-    { id: 6, order: 6, title: "Practice", type: "PRACTICE", badge: "Practice" },
-  ])
+  const [selectedPage, setSelectedPage] = useState(null)
+  const [pages, setPages] = useState([])
 
-  const getPageTypeColor = (type: string) => {
+  useEffect(() => {
+    const unsub = subscribeCollection("pages", (docs) => setPages(docs), { orderBy: { field: "order", direction: "asc" } })
+    return () => unsub()
+  }, [])
+
+  const getPageTypeColor = (type) => {
     switch (type) {
       case "INFO":
         return "bg-blue-500"
@@ -34,55 +33,51 @@ export default function LessonsPage() {
     }
   }
 
-  const handleAddPage = () => {
+  const handleAddPage = async () => {
+    const lastOrder = pages.length ? Math.max(...pages.map((p) => p.order || 0)) : 0
     const newPage = {
-      id: Math.max(...pages.map((p) => p.id), 0) + 1,
-      order: pages.length + 1,
+      order: lastOrder + 1,
       title: "New Page",
       type: "INFO",
       badge: "New Page",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
-    setPages([...pages, newPage])
-    setSelectedPage(newPage)
+    const { id } = await addDocument("pages", newPage)
+    setSelectedPage({ ...newPage, id })
   }
 
-  const handleDeletePage = (id: number) => {
-    const filtered = pages.filter((p) => p.id !== id)
-    setPages(filtered)
-    if (selectedPage?.id === id) {
-      setSelectedPage(filtered[0] || null)
-    }
+  const handleDeletePage = async (id) => {
+    await deleteDocument("pages", id)
+    if (selectedPage?.id === id) setSelectedPage(null)
   }
 
-  const handleMoveUp = (id: number) => {
+  const handleMoveUp = async (id) => {
     const index = pages.findIndex((p) => p.id === id)
     if (index > 0) {
-      const newPages = [...pages]
-      ;[newPages[index], newPages[index - 1]] = [newPages[index - 1], newPages[index]]
-      newPages.forEach((p, i) => (p.order = i + 1))
-      setPages(newPages)
+      const aboveId = pages[index - 1].id
+      await swapOrder("pages", id, aboveId, "order")
     }
   }
 
-  const handleMoveDown = (id: number) => {
+  const handleMoveDown = async (id) => {
     const index = pages.findIndex((p) => p.id === id)
     if (index < pages.length - 1) {
-      const newPages = [...pages]
-      ;[newPages[index], newPages[index + 1]] = [newPages[index + 1], newPages[index]]
-      newPages.forEach((p, i) => (p.order = i + 1))
-      setPages(newPages)
+      const belowId = pages[index + 1].id
+      await swapOrder("pages", id, belowId, "order")
     }
   }
 
   const filteredPages = pages.filter(
     (page) =>
-      page.title.toLowerCase().includes(searchQuery.toLowerCase()) || page.order.toString().includes(searchQuery),
+      page.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(page.order).includes(searchQuery),
   )
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar - Desktop */}
-      <div className="w-20 md:w-64 bg-gray-900 hidden lg:flex flex-col">
+      <div className="w-20 md:w-64 bg-gray-900 flex flex-col">
         <Sidebar />
       </div>
 
@@ -91,7 +86,9 @@ export default function LessonsPage() {
         <div className="fixed inset-0 bg-black/50 lg:hidden z-40" onClick={() => setSidebarOpen(false)} />
       )}
       <div
-        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
@@ -103,13 +100,13 @@ export default function LessonsPage() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
               <div className="flex-1 sm:flex-none">
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Vowels</h1>
-                <p className="text-xs sm:text-sm text-gray-600">あ, い, う, え, お</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Pages</h1>
+                <p className="text-xs sm:text-sm text-gray-600">Manage lesson pages</p>
               </div>
             </div>
             <button
@@ -123,9 +120,9 @@ export default function LessonsPage() {
         </div>
 
         {/* Content Area - Responsive Grid */}
-        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4 p-3 sm:p-6 md:p-8">
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 p-3 sm:p-6 md:p-8 overflow-auto">
           {/* Left Panel - Pages List */}
-          <div className="w-full lg:w-72 flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="w-full lg:w-80 flex flex-col bg-white rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(100vh-160px)]">
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Search */}
               <div className="p-3 sm:p-4 border-b border-gray-200">
