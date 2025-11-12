@@ -29,7 +29,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className=" lg:flex sm:hidden w-64 bg-gray-900 flex-col">
+      <div className="sm:hidden md:hidden lg:flex w-64 bg-gray-900 flex-col">
         <Sidebar />
       </div>
 
