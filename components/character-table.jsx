@@ -6,6 +6,7 @@ import { subscribeCollection, deleteDocument } from "@/lib/firebase"
 export default function CharacterTable({ searchQuery, onEdit }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [items, setItems] = useState([])
+  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
     const unsub = subscribeCollection("characters", (docs) => {
@@ -175,6 +176,18 @@ export default function CharacterTable({ searchQuery, onEdit }) {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirm Delete Action</h3>
+            <p className="text-gray-600 mb-6">{action === "add" ? "Are you sure you want to delete this character?" : "Are you sure you want to delete this character?"}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirm} className="px-4 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition-colors">Confirm</button>
             </div>
           </div>
         </div>
