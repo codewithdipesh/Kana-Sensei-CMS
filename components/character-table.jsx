@@ -6,20 +6,21 @@ import { subscribeCollection, deleteDocument } from "@/lib/firebase"
 export default function CharacterTable({ searchQuery, onEdit }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [items, setItems] = useState([])
-  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
-    const unsub = subscribeCollection("characters", (docs) => {
-      setItems(docs)
-    }, { orderBy: { field: "character", direction: "asc" } })
+    const unsub = subscribeCollection(
+      "characters",
+      (docs) => setItems(docs),
+      { orderBy: { field: "character", direction: "asc" } }
+    )
     return () => unsub()
   }, [])
 
+  const q = (searchQuery ?? "").toString().trim().toLowerCase()
   const filteredData = items.filter((item) => {
-    if (!searchQuery) return true
-    const q = searchQuery.toString().toLowerCase()
+    if (!q) return true
     return (
-      String(item.id).toLowerCase().includes(q) ||
+      String(item.id || "").toLowerCase().includes(q) ||
       String(item.character || "").toLowerCase().includes(q) ||
       String(item.romaji || "").toLowerCase().includes(q)
     )
@@ -37,8 +38,8 @@ export default function CharacterTable({ searchQuery, onEdit }) {
 
   return (
     <>
-      {/* Desktop table view - scrollable for responsive fit */}
-      <div className="md:flex sm:hidden bg-white rounded-lg border border-gray-200">
+      {/* Desktop table view — show on md and larger */}
+      <div className="hidden md:flex bg-white rounded-lg border border-gray-200 w-full">
         <div className="w-full overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -71,12 +72,14 @@ export default function CharacterTable({ searchQuery, onEdit }) {
                         <button
                           onClick={() => onEdit(row)}
                           className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                          aria-label={`Edit ${row.character}`}
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(row.id)}
                           className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                          aria-label={`Delete ${row.character}`}
                         >
                           Del
                         </button>
@@ -96,7 +99,7 @@ export default function CharacterTable({ searchQuery, onEdit }) {
         </div>
       </div>
 
-      {/* Mobile card view */}
+      {/* Mobile card view — show below md */}
       <div className="md:hidden space-y-3">
         {filteredData.length > 0 ? (
           filteredData.map((row) => (
@@ -158,6 +161,7 @@ export default function CharacterTable({ searchQuery, onEdit }) {
         )}
       </div>
 
+      {/* Delete confirmation modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
@@ -173,21 +177,10 @@ export default function CharacterTable({ searchQuery, onEdit }) {
               <button
                 onClick={() => handleDelete(deleteConfirm)}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                aria-label="Confirm delete"
               >
                 Delete
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirm Delete Action</h3>
-            <p className="text-gray-600 mb-6">{action === "add" ? "Are you sure you want to delete this character?" : "Are you sure you want to delete this character?"}</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirm} className="px-4 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition-colors">Confirm</button>
             </div>
           </div>
         </div>

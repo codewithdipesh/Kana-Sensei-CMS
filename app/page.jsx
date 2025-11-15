@@ -29,7 +29,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className="sm:hidden md:hidden lg:flex w-64 bg-gray-900 flex-col">
+      <div className="hidden lg:flex w-64 bg-gray-900 flex-col">
         <Sidebar />
       </div>
 
@@ -37,7 +37,7 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
       )}
       <div
-        className={`fixed left-0 top-0 h-screen w-64 lg:hidden sm:flex transition-transform duration-300 z-50 ${
+        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -51,7 +51,7 @@ export default function Home() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-gray-100 rounded-lg lg:hidden sm:flex transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg lg:hidden transition-colors"
               >
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
