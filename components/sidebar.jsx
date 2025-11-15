@@ -61,7 +61,7 @@ export default function Sidebar({ onClose }) {
         </nav>
 
         {/* Logout */}
-        <div className="px-4 py-6 border-t border-gray-800">
+        <div className="px-4 py-20 border-t border-gray-800">
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 text-red-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
