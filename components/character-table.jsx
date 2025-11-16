@@ -77,8 +77,31 @@ export default function CharacterTable({ searchQuery, onEdit }) {
                     <td className="px-3 py-2 text-sm text-gray-900 font-bold whitespace-nowrap">{row.character}</td>
                     <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">{row.romaji}</td>
                     <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">{row.kana_type}</td>
-                    <td className="px-3 py-2 text-xs text-blue-600 truncate max-w-xs">{row.svgUrl}</td>
-                    <td className="px-3 py-2 text-xs text-blue-600 truncate max-w-xs">{row.audioUrl}</td>
+                    <td className="px-3 py-2">
+                      {row.svgUrl ? (
+                       <a href={row.svgUrl} target="_blank" rel="noopener noreferrer">
+                       <img
+                         src={row.svgUrl}
+                         alt="svg preview"
+                         className="w-8 h-8 object-contain rounded border border-gray-200 hover:scale-110 transition"
+                       />
+                       </a>
+                        ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                     )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.audioUrl ? (
+                      <button
+                        onClick={() => new Audio(row.audioUrl).play()}
+                        className="px-2 py-1 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 text-xs"
+                      >
+                      ▶ Play
+                     </button>
+                    ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                     )}
+                    </td>
                     <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">{row.example_word}</td>
                     <td className="px-3 py-2 text-xs text-gray-900 truncate max-w-xs">{row.notes}</td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap">
