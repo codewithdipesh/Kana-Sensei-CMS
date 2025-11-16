@@ -2,10 +2,24 @@
 
 import { useEffect, useState } from "react"
 import { subscribeCollection, deleteDocument } from "@/lib/firebase"
+import { db } from "@/lib/firebase"
+import { getDoc, doc } from "firebase/firestore"
 
 export default function CharacterTable({ searchQuery, onEdit }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [items, setItems] = useState([])
+
+  const [deleteKey, setDeleteKey] = useState("")
+  const [typedKey, setTypedKey] = useState("")
+  useEffect(() => {
+    const loadKey = async () => {
+      const snap = await getDoc(doc(db, "settings", "delete_key"))
+      if (snap.exists()) {
+        setDeleteKey(snap.data().secret)
+      }
+    }
+    loadKey()
+  }, [])
 
   useEffect(() => {
     const unsub = subscribeCollection(
@@ -30,15 +44,15 @@ export default function CharacterTable({ searchQuery, onEdit }) {
     try {
       await deleteDocument("characters", id)
       setDeleteConfirm(null)
+      setTypedKey("")
     } catch (err) {
-      console.error("Failed to delete character", err)
       alert("Delete failed: " + (err?.message || String(err)))
     }
   }
 
   return (
     <>
-      {/* Desktop table view — show on md and larger */}
+      {/* DESKTOP TABLE (no changes) */}
       <div className="hidden md:flex bg-white rounded-lg border border-gray-200 w-full">
         <div className="w-full overflow-x-auto">
           <table className="w-full">
@@ -72,14 +86,12 @@ export default function CharacterTable({ searchQuery, onEdit }) {
                         <button
                           onClick={() => onEdit(row)}
                           className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                          aria-label={`Edit ${row.character}`}
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(row.id)}
                           className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
-                          aria-label={`Delete ${row.character}`}
                         >
                           Del
                         </button>
@@ -182,23 +194,44 @@ export default function CharacterTable({ searchQuery, onEdit }) {
         )}
       </div>
 
-      {/* Delete confirmation modal */}
+      {/* UPDATED DELETE CONFIRMATION MODAL */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Character</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this character? This action cannot be undone.</p>
+            <p className="text-gray-600 mb-4">
+              Type the secret key to confirm permanent deletion.
+            </p>
+
+            {/* NEW INPUT FIELD */}
+            <input
+              type="text"
+              placeholder="Enter secret key"
+              value={typedKey}
+              onChange={(e) => setTypedKey(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-6"
+            />
+
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => {
+                  setDeleteConfirm(null)
+                  setTypedKey("")
+                }}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
+
               <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                aria-label="Confirm delete"
+                onClick={() => {
+                  if (typedKey !== deleteKey) {
+                    alert("Incorrect secret key")
+                    return
+                  }
+                  handleDelete(deleteConfirm)
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Delete
               </button>
