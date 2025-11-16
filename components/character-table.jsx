@@ -137,6 +137,27 @@ export default function CharacterTable({ searchQuery, onEdit }) {
                     <p className="text-gray-900 text-sm">{row.notes}</p>
                   </div>
                 )}
+                {row.svgUrl && (
+                  <div>
+                    <p className="text-gray-500 text-xs font-semibold">SVG</p>
+                    <a
+                      href={row.svgUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 text-sm underline break-all"
+                    >
+                    View SVG
+                    </a>
+                  </div>
+               )}
+               {row.audioUrl && (
+                 <div>
+                   <p className="text-gray-500 text-xs font-semibold">Audio</p>
+                   <audio controls className="w-full mt-1">
+                      <source src={row.audioUrl} type="audio/mp3" />
+                   </audio>
+                 </div>
+              )}
               </div>
               <div className="flex gap-2 mt-3 sm:mt-4">
                 <button
