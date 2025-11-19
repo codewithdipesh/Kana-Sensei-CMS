@@ -16,15 +16,17 @@ export default function ChaptersPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className="w-64 bg-gray-900 hidden lg:flex flex-col">
+      <div className="hidden lg:flex w-64 bg-gray-900 flex-col">
         <Sidebar />
       </div>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 lg:hidden z-40" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
       )}
       <div
-        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>

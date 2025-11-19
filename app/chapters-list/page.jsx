@@ -3,24 +3,32 @@
 import { useEffect, useState } from "react"
 import { Search, Menu, X, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import Sidebar from "@/components/sidebar"
+import AddChapterModal from "@/components/add-chapter-modal"
 import { subscribeCollection, addDocument, setDocument, deleteDocument, swapOrder } from "@/lib/firebase"
 
 export default function ChaptersListPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [chapters, setChapters] = useState([])
+  const [lessons, setLessons] = useState([])
   const [expandedChapterId, setExpandedChapterId] = useState(null)
   const [editingChapter, setEditingChapter] = useState(null)
   const [formData, setFormData] = useState({ name: "", description: "", scriptType: "", orderNumber: 0 })
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
 
   useEffect(() => {
-    const unsub = subscribeCollection("chapters", (docs) => setChapters(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
-    return () => unsub()
+    const unsubChapters = subscribeCollection("chapters", (docs) => setChapters(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
+    const unsubLessons = subscribeCollection("lessons", (docs) => setLessons(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
+    return () => {
+      unsubChapters()
+      unsubLessons()
+    }
   }, [])
 
   const handleOpenAddModal = () => {
     setEditingChapter(null)
-    setFormData({ name: "", description: "", scriptType: "", orderNumber: chapters.length + 1 })
+    setIsModalOpen(true)
   }
 
   const handleSave = async () => {
@@ -57,14 +65,17 @@ export default function ChaptersListPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className="w-64 bg-gray-900 lg:flex flex-col">
+      <div className="hidden lg:flex w-64 bg-gray-900 flex-col">
         <Sidebar />
       </div>
- 
+
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 lg:hidden z-40" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
       )}
-      <div className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div
+        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+      >
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
@@ -109,13 +120,16 @@ export default function ChaptersListPage() {
                             <div className="flex gap-2 flex-wrap text-xs text-gray-500">
                               <span>ID: {chapter.id}</span>
                               <span>Type: {chapter.scriptType}</span>
-                              <span>Order: {chapter.orderNumber}</span>
+                              <span className="bg-gray-900 text-white px-2 py-1 rounded text-xs font-bold">
+                                #{chapter.orderNumber}
+                              </span>
+
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <button onClick={() => { setEditingChapter(chapter); setFormData({ ...chapter }) }} className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-600 transition-colors">edit</button>
+                        <button onClick={() => { setEditingChapter(chapter); setIsModalOpen(true) }} className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-600 transition-colors">edit</button>
                         <button onClick={() => handleDelete(chapter.id)} className="bg-red-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-600 transition-colors">delete</button>
                         <button onClick={() => moveUp(chapter.id)} className="px-2 py-1 border rounded">↑</button>
                         <button onClick={() => moveDown(chapter.id)} className="px-2 py-1 border rounded">↓</button>
@@ -128,7 +142,18 @@ export default function ChaptersListPage() {
                       <div className="ml-6 sm:ml-10">
                         <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-3">Lessons in this chapter:</h4>
                         <div className="space-y-2">
-                          <div className="text-xs sm:text-sm text-gray-500 italic">No lessons loaded here</div>
+                          {lessons.filter(l => l.chapterId === chapter.id).length > 0 ? (
+                            lessons.filter(l => l.chapterId === chapter.id).map(lesson => (
+                              <div key={lesson.id} className="text-sm text-gray-700 flex items-center gap-2">
+                                <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
+                                  {lesson.orderNumber}
+                                </span>
+                                <span>{lesson.title}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs sm:text-sm text-gray-500 italic">No lessons loaded here</div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -139,6 +164,25 @@ export default function ChaptersListPage() {
           </div>
         </div>
       </main>
+      <AddChapterModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        editingChapter={editingChapter}
+        onSave={async (data, action) => {
+          if (action === "add") {
+            await addDocument("chapters", {
+              ...data,
+              createdAt: new Date().toISOString()
+            })
+          } else {
+            await setDocument("chapters", editingChapter.id, {
+              ...data,
+              updatedAt: new Date().toISOString()
+            })
+          }
+        }}
+      />
+
     </div>
   )
 }

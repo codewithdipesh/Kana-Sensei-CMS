@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { addDocument, updateDocument } from "@/lib/firebase"
 
-export default function AddLessonModal({ isOpen, onClose, editingLesson }) {
+export default function AddLessonModal({ isOpen, onClose, editingLesson, chapters = [] }) {
   const [formData, setFormData] = useState({
     title: "",
     orderNumber: "",
@@ -83,10 +83,43 @@ export default function AddLessonModal({ isOpen, onClose, editingLesson }) {
         </h2>
 
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Title *</label>
+            <input
+              name="title"
+              type="text"
+              value={formData.title}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Order Number *</label>
+            <input
+              name="orderNumber"
+              type="number"
+              value={formData.orderNumber}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Chapter *</label>
+            <select
+              name="chapterId"
+              value={formData.chapterId}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+            >
+              <option value="">Select a Chapter</option>
+              {chapters.map((chapter) => (
+                <option key={chapter.id} value={chapter.id}>
+                  {chapter.name}
+                </option>
+              ))}
+            </select>
+          </div>
           {[
-            { label: "Title *", name: "title", type: "text" },
-            { label: "Order Number *", name: "orderNumber", type: "number" },
-            { label: "Chapter ID *", name: "chapterId", type: "text" },
             { label: "Short Description", name: "shortDescription", type: "text" },
             { label: "Expanded Title", name: "expandedTitle", type: "text" },
           ].map((field) => (

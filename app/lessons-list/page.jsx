@@ -11,13 +11,18 @@ export default function LessonsListPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [lessons, setLessons] = useState([])
+  const [chapters, setChapters] = useState([])
   const [editingLesson, setEditingLesson] = useState(null)
   const [formData, setFormData] = useState({ title: "", orderNumber: 0, chapterId: "", shortDescription: "" })
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
-    const unsub = subscribeCollection("lessons", (docs) => setLessons(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
-    return () => unsub()
+    const unsubLessons = subscribeCollection("lessons", (docs) => setLessons(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
+    const unsubChapters = subscribeCollection("chapters", (docs) => setChapters(docs), { orderBy: { field: "orderNumber", direction: "asc" } })
+    return () => {
+      unsubLessons()
+      unsubChapters()
+    }
   }, [])
 
   const handleOpenAddModal = () => {
@@ -33,7 +38,7 @@ export default function LessonsListPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setEditingLesson(null)
-   }
+  }
   const handleSave = async () => {
     if (!formData.title || !formData.chapterId) {
       alert("Please fill required fields")
@@ -71,19 +76,23 @@ export default function LessonsListPage() {
     return !q || l.title?.toLowerCase().includes(q) || String(l.id).includes(q) || String(l.orderNumber).includes(q)
   })
 
+  const getChapterName = (chapterId) => {
+    const chapter = chapters.find(c => c.id === chapterId)
+    return chapter ? chapter.name : chapterId
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className="w-64 bg-gray-900 lg:flex flex-col">
+      <div className="hidden lg:flex w-64 bg-gray-900 flex-col">
         <Sidebar />
       </div>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 lg:hidden z-40" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
       )}
       <div
-        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 h-screen w-64 lg:hidden transition-transform duration-300 z-50 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
@@ -102,11 +111,11 @@ export default function LessonsListPage() {
             </div>
             <div className="flex gap-2">
               <button
-                 onClick={handleOpenAddModal}
-                 className="bg-black text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap"
+                onClick={handleOpenAddModal}
+                className="bg-black text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap"
               >
-              <Plus className="w-4 h-4" />
-              Add Lesson
+                <Plus className="w-4 h-4" />
+                Add Lesson
               </button>
 
             </div>
@@ -142,16 +151,16 @@ export default function LessonsListPage() {
                           <div className="flex gap-2 flex-wrap text-xs text-gray-500">
                             <span>ID: {lesson.id}</span>
                             <span>Order: {lesson.orderNumber}</span>
-                            <span>Chapter: {lesson.chapterId}</span>
+                            <span>Chapter: {getChapterName(lesson.chapterId)}</span>
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button
-                           onClick={() => handleEditLesson(lesson)}
-                           className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-600 transition-colors"
+                          onClick={() => handleEditLesson(lesson)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-600 transition-colors"
                         >
-                        edit
+                          edit
                         </button>
 
                         <button
@@ -172,9 +181,10 @@ export default function LessonsListPage() {
         </div>
       </main>
       <AddLessonModal
-       isOpen={isModalOpen}
-       onClose={handleCloseModal}
-       editingLesson={editingLesson}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        editingLesson={editingLesson}
+        chapters={chapters}
       />
 
     </div>
