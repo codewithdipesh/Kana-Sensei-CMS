@@ -142,14 +142,22 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
         return (
           <div className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Title</label>
+              <input type="text" value={formData.title} onChange={(e) => handleInputChange("title", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Page title" />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Select Kana</label>
               <select value={formData.kanaSelect} onChange={(e) => handleInputChange("kanaSelect", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <option value="">Choose a kana...</option>
-                {characters.map((char) => (
-                  <option key={char.id} value={char.id}>
-                    {char.character} ({char.romaji}) - {char.kana_type}
-                  </option>
-                ))}
+                {characters && characters.length > 0 ? (
+                  characters.map((char) => (
+                    <option key={char.id} value={char.id}>
+                      {char.character} ({char.romaji}) - {char.kana_type}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No characters available</option>
+                )}
               </select>
             </div>
             <div className="flex items-center gap-3">
@@ -191,14 +199,22 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
         return (
           <div className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Title</label>
+              <input type="text" value={formData.title} onChange={(e) => handleInputChange("title", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Page title" />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Select Kana</label>
               <select value={formData.kanaSelect} onChange={(e) => handleInputChange("kanaSelect", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">Choose a kana...</option>
-                {characters.map((char) => (
-                  <option key={char.id} value={char.id}>
-                    {char.character} ({char.romaji}) - {char.kana_type}
-                  </option>
-                ))}
+                {characters && characters.length > 0 ? (
+                  characters.map((char) => (
+                    <option key={char.id} value={char.id}>
+                      {char.character} ({char.romaji}) - {char.kana_type}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No characters available</option>
+                )}
               </select>
             </div>
             <div>
@@ -230,6 +246,10 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
       case "QUIZ":
         return (
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Title</label>
+              <input type="text" value={formData.title} onChange={(e) => handleInputChange("title", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Page title" />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Question</label>
               <input type="text" value={formData.question} onChange={(e) => handleInputChange("question", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Quiz question" />
