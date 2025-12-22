@@ -1,20 +1,21 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, use } from "react"
 import { Search, Menu, X, Plus, Trash2 } from "lucide-react"
 import Sidebar from "@/components/sidebar"
 import PageEditor from "@/components/page-editor"
+import { subscribeCollection, getDocumentOnce, addDocument, deleteDocument, updateDocument, swapOrder } from "@/lib/firebase"
 
 export default function LessonDetailPage({ params }) {
+  const resolvedParams = use(params)
+  const lessonId = resolvedParams.id
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedPage, setSelectedPage] = useState(null)
-  const [pages, setPages] = useState([
-    { id: 1, order: 1, title: "Animation", type: "ANIMATION", badge: "Animation" },
-    { id: 2, order: 2, title: "Practice-guided", type: "PRACTICE", badge: "Practice-guided" },
-    { id: 3, order: 3, title: "Practice", type: "PRACTICE", badge: "Practice" },
-    { id: 4, order: 4, title: "Illustration", type: "INFO", badge: "Illustration" },
-  ])
+  const [pages, setPages] = useState([])
+  const [lesson, setLesson] = useState(null)
+  const [characters, setCharacters] = useState([])
   const [draggedPage, setDraggedPage] = useState(null)
   const listRef = useRef(null)
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(null)
@@ -23,6 +24,30 @@ export default function LessonDetailPage({ params }) {
   const [allFieldsValid, setAllFieldsValid] = useState(false)
   const [showEditorModal, setShowEditorModal] = useState(false)
   const DELETE_PASSWORD = "verify123"
+
+  // Fetch lesson details and subscribe to pages and characters
+  useEffect(() => {
+    // Fetch lesson info
+    getDocumentOnce("lessons", lessonId).then((lessonData) => {
+      if (lessonData) setLesson(lessonData)
+    })
+
+    // Subscribe to pages subcollection
+    const unsubPages = subscribeCollection(`lessons/${lessonId}/pages`, (docs) => {
+      const sortedPages = docs.sort((a, b) => (a.order || 0) - (b.order || 0))
+      setPages(sortedPages)
+    })
+
+    // Subscribe to characters collection
+    const unsubCharacters = subscribeCollection("characters", (docs) => {
+      setCharacters(docs)
+    })
+
+    return () => {
+      unsubPages()
+      unsubCharacters()
+    }
+  }, [lessonId])
 
   useEffect(() => {
     if (pages.length > 0 && !selectedPage) {
@@ -45,20 +70,29 @@ export default function LessonDetailPage({ params }) {
     }
   }
 
-  const handleAddPage = () => {
-    const baseCharacter = pages[0]?.title?.split("-")[0] || "New"
+  const handleAddPage = async () => {
     const newType = "INFO"
-    const newTitle = `${baseCharacter}-${newType.toLowerCase()}`
+    const newOrder = pages.length + 1
+    const newTitle = `New Page ${newOrder}`
 
-    const newPage = {
-      id: Math.max(...pages.map((p) => p.id), 0) + 1,
-      order: pages.length + 1,
-      title: newTitle,
-      type: "INFO",
-      badge: newTitle,
+    try {
+      const result = await addDocument(`lessons/${lessonId}/pages`, {
+        order: newOrder,
+        title: newTitle,
+        type: newType,
+        badge: newTitle,
+        content: "",
+        kanaId: "",
+        autoPlay: false,
+        hintText: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      // The new page will be added via the subscription
+    } catch (err) {
+      console.error("Failed to add page:", err)
+      alert("Failed to add page")
     }
-    setPages([...pages, newPage])
-    setSelectedPage(newPage)
   }
 
   const handleDragStart = (e, page) => {
@@ -71,7 +105,7 @@ export default function LessonDetailPage({ params }) {
     e.dataTransfer.dropEffect = "move"
   }
 
-  const handleDrop = (e, targetPage) => {
+  const handleDrop = async (e, targetPage) => {
     e.preventDefault()
     if (!draggedPage || draggedPage.id === targetPage.id) return
 
@@ -81,9 +115,18 @@ export default function LessonDetailPage({ params }) {
     const newPages = [...pages]
     newPages.splice(draggedIndex, 1)
     newPages.splice(targetIndex, 0, draggedPage)
-    newPages.forEach((p, i) => (p.order = i + 1))
 
-    setPages(newPages)
+    // Update orders in Firebase
+    try {
+      await Promise.all(
+        newPages.map((p, i) =>
+          updateDocument(`lessons/${lessonId}/pages`, p.id, { order: i + 1 })
+        )
+      )
+    } catch (err) {
+      console.error("Failed to update page order:", err)
+    }
+
     setDraggedPage(null)
   }
 
@@ -103,11 +146,16 @@ export default function LessonDetailPage({ params }) {
     }
   }
 
-  const handleDeletePage = (id) => {
-    const filtered = pages.filter((p) => p.id !== id)
-    setPages(filtered)
-    if (selectedPage?.id === id) {
-      setSelectedPage(filtered[0] || null)
+  const handleDeletePage = async (id) => {
+    try {
+      await deleteDocument(`lessons/${lessonId}/pages`, id)
+      if (selectedPage?.id === id) {
+        const filtered = pages.filter((p) => p.id !== id)
+        setSelectedPage(filtered[0] || null)
+      }
+    } catch (err) {
+      console.error("Failed to delete page:", err)
+      alert("Failed to delete page")
     }
     setShowPasswordPrompt(null)
   }
@@ -153,8 +201,12 @@ export default function LessonDetailPage({ params }) {
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Lesson Editor</h1>
-                <p className="text-xs sm:text-sm text-gray-600">Vowels - ぁ・ぃ・ぅ・ぇ・ぉ</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
+                  {lesson?.expandedTitle || lesson?.title || "Lesson Editor"}
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600">
+                  {lesson?.detailedDescription || lesson?.shortDescription || "Edit lesson pages"}
+                </p>
               </div>
             </div>
             <button onClick={handleAddPage} className="bg-black text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap">
@@ -239,7 +291,7 @@ export default function LessonDetailPage({ params }) {
             {/* Right Panel - Page Editor */}
             <div className="flex-1 flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
               {selectedPage ? (
-                <PageEditor page={selectedPage} onSave={handleSaveChanges} />
+                <PageEditor page={selectedPage} onSave={handleSaveChanges} characters={characters} lessonId={lessonId} />
               ) : (
                 <div className="flex items-center justify-center h-full text-center">
                   <div>
@@ -333,7 +385,7 @@ export default function LessonDetailPage({ params }) {
 
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto">
-              <PageEditor page={selectedPage} onSave={handleSaveChanges} />
+              <PageEditor page={selectedPage} onSave={handleSaveChanges} characters={characters} lessonId={lessonId} />
             </div>
           </div>
         </div>

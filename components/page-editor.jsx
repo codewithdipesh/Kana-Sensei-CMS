@@ -1,20 +1,40 @@
 "use client"
 
-import { useState } from "react"
-import { Save, ChevronDown, X } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Save, ChevronDown, X, Play, Volume2 } from "lucide-react"
+import { updateDocument } from "@/lib/firebase"
 
-export default function PageEditor({ page, onSave }) {
+export default function PageEditor({ page, onSave, characters = [], lessonId }) {
   const [pageType, setPageType] = useState(page.type || "INFO")
   const [formData, setFormData] = useState({
     title: page.title || "",
-    content: "",
-    kanaSelect: "",
-    hintText: "",
-    autoPlay: false,
-    question: "",
-    options: ["", "", "", ""],
-    correctOption: 0,
+    content: page.content || "",
+    kanaSelect: page.kanaId || "",
+    hintText: page.hintText || "",
+    autoPlay: page.autoPlay || false,
+    question: page.question || "",
+    options: page.options || ["", "", "", ""],
+    correctOption: page.correctOption || 0,
   })
+  const audioRef = useRef(null)
+
+  // Get selected character data
+  const selectedKana = characters.find((c) => c.id === formData.kanaSelect)
+
+  // Reset form when page changes
+  useEffect(() => {
+    setPageType(page.type || "INFO")
+    setFormData({
+      title: page.title || "",
+      content: page.content || "",
+      kanaSelect: page.kanaId || "",
+      hintText: page.hintText || "",
+      autoPlay: page.autoPlay || false,
+      question: page.question || "",
+      options: page.options || ["", "", "", ""],
+      correctOption: page.correctOption || 0,
+    })
+  }, [page.id])
 
   const [imagePreview, setImagePreview] = useState(null)
   const [validationErrors, setValidationErrors] = useState([])
@@ -30,7 +50,7 @@ export default function PageEditor({ page, onSave }) {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errors = []
     if (!formData.title.trim()) errors.push("Page title is required")
     if ((pageType === "ANIMATION" || pageType === "PRACTICE") && !formData.kanaSelect) errors.push("Select Kana is required")
@@ -45,7 +65,39 @@ export default function PageEditor({ page, onSave }) {
     }
     setValidationErrors([])
     const confirmSave = confirm("Checklist:\n✓ All required fields are filled\n✓ Page type is correct\n✓ All content is accurate\n\nProceed with saving changes?")
-    if (confirmSave && onSave) onSave()
+    if (confirmSave) {
+      try {
+        await updateDocument(`lessons/${lessonId}/pages`, page.id, {
+          title: formData.title,
+          type: pageType,
+          badge: formData.title,
+          content: formData.content,
+          kanaId: formData.kanaSelect,
+          autoPlay: formData.autoPlay,
+          hintText: formData.hintText,
+          question: formData.question,
+          options: formData.options,
+          correctOption: formData.correctOption,
+          updatedAt: new Date().toISOString(),
+        })
+        alert("Page saved successfully!")
+        if (onSave) onSave()
+      } catch (err) {
+        console.error("Failed to save page:", err)
+        alert("Failed to save page")
+      }
+    }
+  }
+
+  // Play audio function
+  const playAudio = () => {
+    if (selectedKana?.audioUrl) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+      audioRef.current = new Audio(selectedKana.audioUrl)
+      audioRef.current.play()
+    }
   }
 
   const getPageTypeColor = (type) => {
@@ -92,21 +144,45 @@ export default function PageEditor({ page, onSave }) {
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Select Kana</label>
               <select value={formData.kanaSelect} onChange={(e) => handleInputChange("kanaSelect", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                <option>Choose a kana...</option>
-                <option>あ (a)</option>
-                <option>い (i)</option>
+                <option value="">Choose a kana...</option>
+                {characters.map((char) => (
+                  <option key={char.id} value={char.id}>
+                    {char.character} ({char.romaji}) - {char.kana_type}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex items-center gap-3">
-              <input type="checkbox" checked={formData.autoPlay} onChange={(e) => handleInputChange("autoPlay", e.target.checked)} className="w-4 h-4 rounded" />
-              <label className="text-sm font-medium text-gray-900">Auto Play Animation</label>
+              <input type="checkbox" checked={formData.autoPlay} onChange={(e) => handleInputChange("autoPlay", e.target.checked)} className="w-4 h-4 rounded" id="autoplay" />
+              <label htmlFor="autoplay" className="text-sm font-medium text-gray-900">Auto Play Animation</label>
             </div>
             <div className="bg-gray-100 rounded-lg p-6 text-center">
-              <p className="text-4xl font-bold text-gray-900 mb-4">あ</p>
-              <div className="w-full h-32 bg-white rounded border border-gray-300 flex items-center justify-center">
-                <p className="text-gray-500 text-sm">SVG Preview</p>
+              <p className="text-4xl font-bold text-gray-900 mb-4">{selectedKana?.character || "Select a kana"}</p>
+              <div className="w-full h-48 bg-white rounded border border-gray-300 flex items-center justify-center overflow-hidden">
+                {selectedKana?.svgUrl ? (
+                  <img
+                    src={selectedKana.svgUrl}
+                    alt={`${selectedKana.character} stroke order`}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <p className="text-gray-500 text-sm">SVG Preview - Select a kana to preview</p>
+                )}
               </div>
-              <button className="mt-4 bg-purple-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-purple-600 transition-colors">▶ Play Audio</button>
+              <button
+                onClick={playAudio}
+                disabled={!selectedKana?.audioUrl}
+                className="mt-4 bg-purple-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-2 mx-auto disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                <Volume2 className="w-4 h-4" />
+                Play Audio
+              </button>
+              {selectedKana && (
+                <div className="mt-4 text-sm text-gray-600">
+                  <p><span className="font-semibold">Romaji:</span> {selectedKana.romaji}</p>
+                  {selectedKana.example_word && <p><span className="font-semibold">Example:</span> {selectedKana.example_word}</p>}
+                </div>
+              )}
             </div>
           </div>
         )
@@ -117,9 +193,12 @@ export default function PageEditor({ page, onSave }) {
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Select Kana</label>
               <select value={formData.kanaSelect} onChange={(e) => handleInputChange("kanaSelect", e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option>Choose a kana...</option>
-                <option>あ (a)</option>
-                <option>い (i)</option>
+                <option value="">Choose a kana...</option>
+                {characters.map((char) => (
+                  <option key={char.id} value={char.id}>
+                    {char.character} ({char.romaji}) - {char.kana_type}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -128,11 +207,22 @@ export default function PageEditor({ page, onSave }) {
             </div>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p className="text-sm font-semibold text-gray-900">Preview</p>
-              <p className="text-3xl font-bold text-center">あ</p>
-              <div className="text-sm space-y-1">
-                <p><span className="font-semibold">Romaji:</span> a</p>
-                <p><span className="font-semibold">Example:</span> Apple</p>
-              </div>
+              <p className="text-3xl font-bold text-center">{selectedKana?.character || "Select a kana"}</p>
+              {selectedKana && (
+                <div className="text-sm space-y-1">
+                  <p><span className="font-semibold">Romaji:</span> {selectedKana.romaji}</p>
+                  {selectedKana.example_word && <p><span className="font-semibold">Example:</span> {selectedKana.example_word}</p>}
+                </div>
+              )}
+              {selectedKana?.audioUrl && (
+                <button
+                  onClick={playAudio}
+                  className="mt-2 bg-green-500 text-white px-3 py-1 rounded text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  Play Audio
+                </button>
+              )}
             </div>
           </div>
         )
