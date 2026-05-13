@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, use } from "react"
 import { Search, Menu, X, Plus, Trash2 } from "lucide-react"
 import Sidebar from "@/components/sidebar"
-import PageEditor from "@/components/page-editor"
+import PageEditor, { getPageTypeColor, normalizePageType } from "@/components/page-editor"
+import AddPagesModal from "@/components/add-pages-modal"
 import { subscribeCollection, getDocumentOnce, addDocument, deleteDocument, updateDocument, swapOrder } from "@/lib/firebase"
 
 export default function LessonDetailPage({ params }) {
@@ -23,6 +24,7 @@ export default function LessonDetailPage({ params }) {
   const [showChecklist, setShowChecklist] = useState(false)
   const [allFieldsValid, setAllFieldsValid] = useState(false)
   const [showEditorModal, setShowEditorModal] = useState(false)
+  const [showAddPagesModal, setShowAddPagesModal] = useState(false)
   const DELETE_PASSWORD = "verify123"
 
   // Fetch lesson details and subscribe to pages and characters
@@ -34,7 +36,8 @@ export default function LessonDetailPage({ params }) {
 
     // Subscribe to pages subcollection
     const unsubPages = subscribeCollection(`lessons/${lessonId}/pages`, (docs) => {
-      const sortedPages = docs.sort((a, b) => (a.order || 0) - (b.order || 0))
+      const normalized = docs.map((d) => ({ ...d, type: normalizePageType(d.type) }))
+      const sortedPages = normalized.sort((a, b) => (a.order || 0) - (b.order || 0))
       setPages(sortedPages)
     })
 
@@ -55,45 +58,7 @@ export default function LessonDetailPage({ params }) {
     }
   }, [pages, selectedPage])
 
-  const getPageTypeColor = (type) => {
-    switch (type) {
-      case "INFO":
-        return "bg-blue-500"
-      case "ANIMATION":
-        return "bg-purple-500"
-      case "PRACTICE":
-        return "bg-green-500"
-      case "QUIZ":
-        return "bg-yellow-500"
-      default:
-        return "bg-gray-500"
-    }
-  }
-
-  const handleAddPage = async () => {
-    const newType = "INFO"
-    const newOrder = pages.length + 1
-    const newTitle = `New Page ${newOrder}`
-
-    try {
-      const result = await addDocument(`lessons/${lessonId}/pages`, {
-        order: newOrder,
-        title: newTitle,
-        type: newType,
-        badge: newTitle,
-        content: "",
-        kanaId: "",
-        autoPlay: false,
-        hintText: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      // The new page will be added via the subscription
-    } catch (err) {
-      console.error("Failed to add page:", err)
-      alert("Failed to add page")
-    }
-  }
+  const handleAddPage = () => setShowAddPagesModal(true)
 
   const handleDragStart = (e, page) => {
     setDraggedPage(page)
@@ -211,7 +176,7 @@ export default function LessonDetailPage({ params }) {
             </div>
             <button onClick={handleAddPage} className="bg-black text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap">
               <Plus className="w-4 h-4" />
-              Add Page
+              Add Pages
             </button>
           </div>
         </div>
@@ -298,7 +263,7 @@ export default function LessonDetailPage({ params }) {
                     <p className="text-gray-500 text-sm mb-4">Select a page to edit or create a new one</p>
                     <button onClick={handleAddPage} className="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600 transition-colors inline-flex items-center gap-2">
                       <Plus className="w-4 h-4" />
-                      Create Page
+                      Create Pages
                     </button>
                   </div>
                 </div>
@@ -390,6 +355,15 @@ export default function LessonDetailPage({ params }) {
           </div>
         </div>
       )}
+
+      {/* Bulk Add Pages Modal */}
+      <AddPagesModal
+        open={showAddPagesModal}
+        onClose={() => setShowAddPagesModal(false)}
+        lessonId={lessonId}
+        characters={characters}
+        currentPageCount={pages.length}
+      />
 
       {/* Delete Confirmation Modal */}
       {showPasswordPrompt && (
