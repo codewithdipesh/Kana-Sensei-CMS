@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Save, ChevronDown, X, Volume2 } from "lucide-react"
 import { updateDocument } from "@/lib/firebase"
+import KanaSearchSelect from "@/components/kana-search-select"
 
 const PAGE_TYPES = ["INFO", "LISTEN", "STROKE", "TRACE", "WRITE", "QUIZ"]
 
@@ -143,18 +144,12 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
   const KanaSelect = ({ ringClass }) => (
     <div>
       <label className="block text-sm font-medium text-gray-900 mb-2">Select Kana</label>
-      <select value={formData.kanaSelect} onChange={(e) => handleInputChange("kanaSelect", e.target.value)} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ringClass}`}>
-        <option value="">Choose a kana...</option>
-        {characters && characters.length > 0 ? (
-          characters.map((char) => (
-            <option key={char.id} value={char.id}>
-              {char.character} ({char.romaji}) - {char.kana_type}
-            </option>
-          ))
-        ) : (
-          <option disabled>No characters available</option>
-        )}
-      </select>
+      <KanaSearchSelect
+        characters={characters}
+        value={formData.kanaSelect}
+        onChange={(id) => handleInputChange("kanaSelect", id)}
+        ringClass={ringClass}
+      />
     </div>
   )
 

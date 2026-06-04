@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { X, Plus, Trash2, GripVertical } from "lucide-react"
 import { addDocument } from "@/lib/firebase"
 import { getPageTypeColor } from "@/components/page-editor"
+import KanaSearchSelect from "@/components/kana-search-select"
 
 const STEP_TYPES = ["INFO", "LISTEN", "STROKE", "TRACE", "WRITE", "QUIZ"]
 
@@ -139,18 +140,12 @@ export default function AddPagesModal({ open, onClose, lessonId, characters, cur
             <label className="block text-sm font-medium text-gray-900 mb-2">
               Kana {kanaRequired ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(not needed for current steps)</span>}
             </label>
-            <select
+            <KanaSearchSelect
+              characters={characters}
               value={kanaId}
-              onChange={(e) => setKanaId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Choose a kana...</option>
-              {characters.map((char) => (
-                <option key={char.id} value={char.id}>
-                  {char.character} ({char.romaji}) - {char.kana_type}
-                </option>
-              ))}
-            </select>
+              onChange={setKanaId}
+              ringClass="focus:ring-blue-500"
+            />
           </div>
 
           <div>

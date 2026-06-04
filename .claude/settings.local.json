@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx --no-install next build)"
+      "Bash(npx --no-install next build)",
+      "Bash(npx eslint *)"
     ]
   }
 }
