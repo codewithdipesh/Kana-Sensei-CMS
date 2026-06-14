@@ -4,6 +4,18 @@ import { useState, useEffect, useRef } from "react"
 import { Save, ChevronDown, X, Volume2 } from "lucide-react"
 import { updateDocument } from "@/lib/firebase"
 import KanaSearchSelect from "@/components/kana-search-select"
+import {
+  applyQuizPreset,
+  createDefaultQuizConfig,
+  deriveQuizConfigFromPage,
+  mergeQuizConfig,
+  QUIZ_KINDS,
+  QUIZ_PRESETS,
+  QUIZ_RESPONSE_MODES,
+  QUIZ_SCOPES,
+  QUIZ_SOURCE_MODES,
+  QUIZ_TARGET_MODES,
+} from "@/lib/quiz"
 
 const PAGE_TYPES = ["INFO", "LISTEN", "STROKE", "TRACE", "WRITE", "QUIZ"]
 
@@ -50,6 +62,7 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
     question: page.question || "",
     options: page.options || ["", "", "", ""],
     correctOption: page.correctOption || 0,
+    quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
   })
   const audioRef = useRef(null)
 
@@ -68,6 +81,7 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
       question: page.question || "",
       options: page.options || ["", "", "", ""],
       correctOption: page.correctOption || 0,
+      quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
     })
   }, [page.id])
 
@@ -91,6 +105,35 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
     }
   }
 
+  const quizConfig = formData.quizConfig || createDefaultQuizConfig()
+  const mcqOptions = Array.isArray(quizConfig.legacy?.options) ? quizConfig.legacy.options : ["", "", "", ""]
+  const quizSourceNeedsKana = ["kana", "audio", "svg"].includes(quizConfig.source?.modality)
+  const quizAnswerNeedsKana = quizConfig.answer?.modality === "kana"
+  const deriveKindFromResponseMode = (responseMode) => {
+    if (responseMode === "ordering") return "composition"
+    if (responseMode === "typing" || responseMode === "drawing") return "production"
+    return "recognition"
+  }
+
+  const updateQuizConfig = (updates) => {
+    setFormData((prev) => ({
+      ...prev,
+      quizConfig: mergeQuizConfig(prev.quizConfig, updates),
+    }))
+  }
+
+  const applyQuizPresetToForm = (presetId) => {
+    setFormData((prev) => {
+      const nextQuiz = applyQuizPreset(prev.quizConfig, presetId)
+      return {
+        ...prev,
+        quizConfig: nextQuiz,
+        question: nextQuiz.metadata?.title || prev.question,
+        hintText: nextQuiz.metadata?.hint || prev.hintText,
+      }
+    })
+  }
+
   const handleSave = async () => {
     const errors = []
     if (!formData.title.trim()) errors.push("Page title is required")
@@ -98,8 +141,24 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
       errors.push("Select Kana is required")
     }
     if (pageType === "QUIZ") {
-      if (!formData.question.trim()) errors.push("Question is required for quizzes")
-      if (formData.options.some((opt) => !opt.trim())) errors.push("All quiz options must be filled")
+      const prompt = quizConfig.metadata?.title || formData.question || formData.title
+      if (!prompt.trim()) errors.push("Quiz prompt is required")
+      if ((quizSourceNeedsKana || quizAnswerNeedsKana) && !formData.kanaSelect) {
+        errors.push("Select Kana is required for this quiz")
+      }
+      if (quizConfig.kind === "composition") {
+        const parts = Array.isArray(quizConfig.composition?.parts) ? quizConfig.composition.parts : []
+        if (parts.length === 0) errors.push("Add at least one composition part")
+      }
+      if (quizConfig.responseMode === "mcq") {
+        const options = Array.isArray(quizConfig.legacy?.options) ? quizConfig.legacy.options : []
+        const filledOptions = options.filter((option) => String(option || "").trim())
+        if (filledOptions.length < 2) errors.push("MCQ quizzes need at least 2 options")
+        if (quizConfig.legacy?.correctOption == null) errors.push("Choose the correct option")
+      }
+      if ((quizConfig.responseMode === "typing" || quizConfig.responseMode === "drawing") && !String(quizConfig.answer?.value || "").trim()) {
+        errors.push("Set the expected answer value")
+      }
     }
     if (errors.length > 0) {
       setValidationErrors(errors)
@@ -110,7 +169,7 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
     const confirmSave = confirm("Checklist:\n✓ All required fields are filled\n✓ Page type is correct\n✓ All content is accurate\n\nProceed with saving changes?")
     if (confirmSave) {
       try {
-        await updateDocument(`lessons/${lessonId}/pages`, page.id, {
+        const updatePayload = {
           title: formData.title,
           type: pageType,
           badge: formData.title,
@@ -119,11 +178,39 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
           autoPlay: formData.autoPlay,
           hintText: formData.hintText,
           showGuide: formData.showGuide,
-          question: formData.question,
-          options: formData.options,
-          correctOption: formData.correctOption,
           updatedAt: new Date().toISOString(),
-        })
+        }
+
+        if (pageType === "QUIZ") {
+          const nextQuizConfig = mergeQuizConfig(formData.quizConfig || createDefaultQuizConfig(), {
+            metadata: {
+              title: quizConfig.metadata?.title || formData.question || formData.title,
+              hint: quizConfig.metadata?.hint || formData.hintText || "",
+              tags: formData.kanaSelect ? ["kana"] : ["legacy"],
+            },
+            source: {
+              refIds: formData.kanaSelect ? [formData.kanaSelect] : [],
+            },
+            answer: {
+              refIds: formData.kanaSelect ? [formData.kanaSelect] : [],
+            },
+          })
+
+          updatePayload.quizConfig = nextQuizConfig
+          updatePayload.question = nextQuizConfig.metadata?.title || formData.question || formData.title
+          updatePayload.options = nextQuizConfig.responseMode === "mcq"
+            ? nextQuizConfig.legacy?.options || []
+            : []
+          updatePayload.correctOption = nextQuizConfig.responseMode === "mcq"
+            ? nextQuizConfig.legacy?.correctOption || 0
+            : 0
+        } else {
+          updatePayload.question = formData.question
+          updatePayload.options = formData.options
+          updatePayload.correctOption = formData.correctOption
+        }
+
+        await updateDocument(`lessons/${lessonId}/pages`, page.id, updatePayload)
         alert("Page saved successfully!")
         if (onSave) onSave()
       } catch (err) {
@@ -297,25 +384,273 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
 
       case "QUIZ":
         return (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <TitleInput ringClass={ring} />
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Question</label>
-              <input type="text" value={formData.question} onChange={(e) => handleInputChange("question", e.target.value)} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`} placeholder="Quiz question" />
-            </div>
-            <div className="space-y-3">
-              {formData.options.map((option, index) => (
-                <div key={index}>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Option {index + 1}</label>
-                  <input type="text" value={option} onChange={(e) => { const newOptions = [...formData.options]; newOptions[index] = e.target.value; handleInputChange("options", newOptions) }} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`} placeholder={`Enter option ${index + 1}`} />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-900">Preset</label>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (!e.target.value) return
+                    applyQuizPresetToForm(e.target.value)
+                  }}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                >
+                  <option value="">Custom quiz</option>
+                  {QUIZ_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>{preset.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">Pick a starting shape, then tune the fields below.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Kind</label>
+                  <select
+                    value={quizConfig.kind}
+                    onChange={(e) => {
+                      const nextKind = e.target.value
+                      const nextResponseMode =
+                        nextKind === "composition" ? "ordering" :
+                        nextKind === "production" ? "typing" :
+                        "mcq"
+                      updateQuizConfig({
+                        kind: nextKind,
+                        responseMode: nextResponseMode,
+                      })
+                    }}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  >
+                    {QUIZ_KINDS.map((kind) => (
+                      <option key={kind} value={kind}>{kind}</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Scope</label>
+                  <select
+                    value={quizConfig.scope}
+                    onChange={(e) => updateQuizConfig({ scope: e.target.value })}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  >
+                    {QUIZ_SCOPES.map((scope) => (
+                      <option key={scope} value={scope}>{scope}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Response</label>
+                  <select
+                    value={quizConfig.responseMode}
+                    onChange={(e) => updateQuizConfig({
+                      responseMode: e.target.value,
+                      kind: deriveKindFromResponseMode(e.target.value),
+                    })}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  >
+                    {QUIZ_RESPONSE_MODES.map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Answer</label>
+                  <select
+                    value={quizConfig.answer?.modality || "romaji"}
+                    onChange={(e) => updateQuizConfig({ answer: { modality: e.target.value } })}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  >
+                    {QUIZ_TARGET_MODES.map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Correct Option</label>
-              <select value={formData.correctOption} onChange={(e) => handleInputChange("correctOption", Number.parseInt(e.target.value))} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}>
-                {formData.options.map((_, index) => <option key={index} value={index}>Option {index + 1}</option>)}
-              </select>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Prompt</p>
+                    <p className="text-xs text-gray-500">What the learner sees first.</p>
+                  </div>
+                  {quizSourceNeedsKana || quizAnswerNeedsKana ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-white border border-gray-200 px-2 py-1 rounded">
+                      Kana linked
+                    </span>
+                  ) : null}
+                </div>
+                <input
+                  type="text"
+                  value={quizConfig.metadata?.title || ""}
+                  onChange={(e) => updateQuizConfig({ metadata: { title: e.target.value } })}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  placeholder="Enter the quiz prompt"
+                />
+                <input
+                  type="text"
+                  value={quizConfig.metadata?.hint || ""}
+                  onChange={(e) => updateQuizConfig({ metadata: { hint: e.target.value } })}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  placeholder="Optional hint"
+                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Source modality</label>
+                  <select
+                    value={quizConfig.source?.modality || "kana"}
+                    onChange={(e) => updateQuizConfig({ source: { modality: e.target.value } })}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                  >
+                    {QUIZ_SOURCE_MODES.map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-900">Source preview</label>
+                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                    {quizConfig.source?.modality === "kana" && selectedKana && (
+                      <div className="space-y-1">
+                        <p className="text-2xl font-bold text-gray-900">{selectedKana.character}</p>
+                        <p>Romaji: {selectedKana.romaji}</p>
+                        {selectedKana.audioUrl && <p>Audio available</p>}
+                      </div>
+                    )}
+                    {quizConfig.source?.modality === "audio" && (
+                      <p>{selectedKana?.audioUrl ? "Audio from selected kana" : "Pick a kana to attach audio."}</p>
+                    )}
+                    {quizConfig.source?.modality === "svg" && (
+                      <div className="space-y-2">
+                        <p>{selectedKana?.svgUrl ? "SVG from selected kana" : "Pick a kana to attach SVG."}</p>
+                        {selectedKana?.svgUrl && (
+                          <img src={selectedKana.svgUrl} alt="quiz source svg preview" className="max-h-28 object-contain mx-auto" />
+                        )}
+                      </div>
+                    )}
+                    {(quizConfig.source?.modality === "romaji" || quizConfig.source?.modality === "text" || quizConfig.source?.modality === "word") && (
+                      <input
+                        type="text"
+                        value={quizConfig.source?.value || ""}
+                        onChange={(e) => updateQuizConfig({ source: { value: e.target.value } })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Source text"
+                      />
+                    )}
+                  </div>
+                </div>
+                {(quizSourceNeedsKana || quizAnswerNeedsKana) && (
+                  <KanaSelect ringClass={ring} />
+                )}
+              </div>
+
+              <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Answer setup</p>
+                  <p className="text-xs text-gray-500">How the learner responds.</p>
+                </div>
+
+                {quizConfig.responseMode === "mcq" ? (
+                  <div className="space-y-3">
+                    {mcqOptions.map((option, index) => (
+                      <div key={index}>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">Option {index + 1}</label>
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => {
+                            const nextOptions = [...mcqOptions]
+                            nextOptions[index] = e.target.value
+                            updateQuizConfig({ legacy: { options: nextOptions } })
+                          }}
+                          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                          placeholder={`Option ${index + 1}`}
+                        />
+                      </div>
+                    ))}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Correct option</label>
+                      <select
+                        value={quizConfig.legacy?.correctOption ?? 0}
+                        onChange={(e) => updateQuizConfig({ legacy: { correctOption: Number.parseInt(e.target.value, 10) } })}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                      >
+                        {(quizConfig.legacy?.options || []).map((_, index) => (
+                          <option key={index} value={index}>Option {index + 1}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Expected answer</label>
+                      <input
+                        type="text"
+                        value={quizConfig.answer?.value || ""}
+                        onChange={(e) => updateQuizConfig({ answer: { value: e.target.value } })}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                        placeholder="What should the learner produce?"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Accepted values</label>
+                      <input
+                        type="text"
+                        value={(quizConfig.answer?.acceptedValues || []).join(", ")}
+                        onChange={(e) => updateQuizConfig({ answer: { acceptedValues: e.target.value.split(",").map((value) => value.trim()).filter(Boolean) } })}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                        placeholder="comma-separated alternatives"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {quizConfig.responseMode === "ordering" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Composition parts</label>
+                      <input
+                        type="text"
+                        value={(quizConfig.composition?.parts || []).join(", ")}
+                        onChange={(e) => updateQuizConfig({
+                          composition: {
+                            parts: e.target.value.split(",").map((value) => value.trim()).filter(Boolean),
+                          },
+                        })}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                        placeholder="su, shi"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Final output</label>
+                      <input
+                        type="text"
+                        value={quizConfig.composition?.output || ""}
+                        onChange={(e) => updateQuizConfig({ composition: { output: e.target.value } })}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                        placeholder="すし"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {quizAnswerNeedsKana && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                    This quiz expects a kana answer, so the selected kana will be used as the canonical target.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+              <p className="font-semibold">Saved shape</p>
+              <p className="mt-1">
+                `quizConfig` stores the recipe. `question`, `options`, and `correctOption` stay in sync for legacy MCQ pages.
+              </p>
             </div>
           </div>
         )

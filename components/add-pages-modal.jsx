@@ -5,6 +5,7 @@ import { X, Plus, Trash2, GripVertical } from "lucide-react"
 import { addDocument } from "@/lib/firebase"
 import { getPageTypeColor } from "@/components/page-editor"
 import KanaSearchSelect from "@/components/kana-search-select"
+import { createDefaultQuizConfig } from "@/lib/quiz"
 
 const STEP_TYPES = ["INFO", "LISTEN", "STROKE", "TRACE", "WRITE", "QUIZ"]
 
@@ -97,7 +98,7 @@ export default function AddPagesModal({ open, onClose, lessonId, characters, cur
         const title = needsKana(type) && kanaLabel
           ? `${kanaLabel} — ${stepLabel(type)}`
           : `${stepLabel(type)} ${baseOrder + i + 1}`
-        await addDocument(`lessons/${lessonId}/pages`, {
+        const pagePayload = {
           order: baseOrder + i + 1,
           title,
           type,
@@ -112,7 +113,31 @@ export default function AddPagesModal({ open, onClose, lessonId, characters, cur
           correctOption: 0,
           createdAt: now,
           updatedAt: now,
-        })
+        }
+
+        if (type === "QUIZ") {
+          pagePayload.quizConfig = createDefaultQuizConfig({
+            metadata: {
+              title,
+              hint: "",
+              tags: kanaId ? ["kana"] : ["legacy"],
+            },
+            source: {
+              modality: kanaId ? "kana" : "text",
+              refIds: kanaId ? [kanaId] : [],
+              value: kanaLabel || title,
+            },
+            answer: {
+              modality: kanaId ? "romaji" : "text",
+              refIds: kanaId ? [kanaId] : [],
+              value: "",
+              acceptedValues: [],
+            },
+            scope: kanaId ? "kana" : "text",
+          })
+        }
+
+        await addDocument(`lessons/${lessonId}/pages`, pagePayload)
       }
 
       reset()
