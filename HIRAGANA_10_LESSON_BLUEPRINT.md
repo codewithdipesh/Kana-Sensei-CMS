@@ -1,4 +1,4 @@
-# Hiragana 10-Lesson Blueprint
+ # Hiragana 10-Lesson Blueprint
 
 This is the lesson structure I would use for the Hiragana basics chapter.
 
@@ -11,11 +11,12 @@ Every lesson follows this learning loop:
 1. `INFO` intro
 2. `LISTEN`
 3. `STROKE`
-4. `TRACE`
-5. `WRITE`
-6. `QUIZ`
-7. repeat for the next kana
-8. end with a `REVIEW QUIZ`
+4. `WRITE`
+5. `QUIZ`
+6. repeat for the next kana
+7. end with a `REVIEW QUIZ`
+
+> Note: the current CMS does not have a `TRACE` page. If you add one later, place it between `STROKE` and `WRITE`.
 
 ## Quiz Rotation Rule
 
@@ -32,10 +33,25 @@ For each kana, use:
 
 - `LISTEN` = hear the sound
 - `STROKE` = see stroke order
-- `TRACE` = trace with support
 - `WRITE` = write from memory
 
 Then place a quiz after a few kana blocks, not only at the end.
+
+## Smart Review Rule
+
+Do not repeat every old kana equally. That gets boring and wastes attention.
+
+Use a weighted review pool instead:
+
+- 60% from the current lesson
+- 30% from the previous 1 to 2 lessons
+- 10% from earlier lessons as random reinforcement
+
+Suggested repetition pattern:
+
+- after each new kana, include 1 review question from an earlier kana
+- after every 2 to 3 new kana, include 1 mixed question
+- the final review quiz should reuse only the most important older kana, not the full history
 
 ## Lesson 1 - Vowels
 
@@ -74,6 +90,7 @@ Quizzes:
   - Prompt: `Which kana matches the sound "o"?`
   - Target: `お`
   - Options: `あ / え / お / い`
+  - Review source: current lesson + recent lessons + one older kana
 
 ## Lesson 2 - K Row
 
@@ -112,6 +129,7 @@ Quizzes:
   - Prompt: `Which kana matches romaji "ku"?`
   - Target: `く`
   - Options: `こ / く / け / あ`
+  - Review source: current lesson + recent lessons + one older kana
 
 ## Lesson 3 - S Row
 
@@ -150,6 +168,7 @@ Quizzes:
   - Prompt: `Which romaji matches this kana: す?`
   - Target: `su`
   - Options: `sa / shi / su / se`
+  - Review source: current lesson + recent lessons + one older kana
 
 ## Lesson 4 - T Row
 
@@ -348,6 +367,7 @@ Quizzes:
 - a consistent page structure
 - sound quizzes in every lesson
 - a rotated quiz style so lessons do not feel repetitive
+- smart repetition so old kana keep coming back naturally
 - gradual difficulty from recognition to recall
 - a final review step at the end of each lesson
 
@@ -362,3 +382,13 @@ For each lesson, keep this pattern:
 
 That is the best balance between teaching and memory for beginners.
 
+## Implementation Rule For Repeat Content
+
+When generating quiz review items in the CMS or compose app:
+
+- always prioritize the kana just taught
+- then pull 1 to 2 kana from the previous lesson
+- then pull 1 older kana from the chapter
+- never show every old kana in a flat random list
+
+That is what makes the repetition feel smart instead of exhausting.

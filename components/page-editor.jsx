@@ -60,7 +60,7 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
     autoPlay: page.autoPlay || false,
     showGuide: page.showGuide ?? (normalizePageType(page.type) === "TRACE"),
     question: page.question || "",
-    options: page.options || ["", "", "", ""],
+    options: page.options || ["", ""],
     correctOption: page.correctOption || 0,
     quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
   })
@@ -79,7 +79,7 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
       autoPlay: page.autoPlay || false,
       showGuide: page.showGuide ?? (normalized === "TRACE"),
       question: page.question || "",
-      options: page.options || ["", "", "", ""],
+      options: page.options || ["", ""],
       correctOption: page.correctOption || 0,
       quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
     })
@@ -555,20 +555,51 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
 
                 {quizConfig.responseMode === "mcq" ? (
                   <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-900">Multiple Choice Options</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextOptions = [...mcqOptions, ""]
+                          updateQuizConfig({ legacy: { options: nextOptions } })
+                        }}
+                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-medium"
+                      >
+                        + Add Option
+                      </button>
+                    </div>
                     {mcqOptions.map((option, index) => (
-                      <div key={index}>
-                        <label className="block text-sm font-medium text-gray-900 mb-1">Option {index + 1}</label>
-                        <input
-                          type="text"
-                          value={option}
-                          onChange={(e) => {
-                            const nextOptions = [...mcqOptions]
-                            nextOptions[index] = e.target.value
-                            updateQuizConfig({ legacy: { options: nextOptions } })
-                          }}
-                          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
-                          placeholder={`Option ${index + 1}`}
-                        />
+                      <div key={index} className="flex gap-2 items-start">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-900 mb-1">Option {index + 1}</label>
+                          <input
+                            type="text"
+                            value={option}
+                            onChange={(e) => {
+                              const nextOptions = [...mcqOptions]
+                              nextOptions[index] = e.target.value
+                              updateQuizConfig({ legacy: { options: nextOptions } })
+                            }}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${ring}`}
+                            placeholder={`Option ${index + 1}`}
+                          />
+                        </div>
+                        {mcqOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextOptions = mcqOptions.filter((_, i) => i !== index)
+                              let nextCorrect = quizConfig.legacy?.correctOption ?? 0
+                              if (nextCorrect >= nextOptions.length) {
+                                nextCorrect = Math.max(0, nextOptions.length - 1)
+                              }
+                              updateQuizConfig({ legacy: { options: nextOptions, correctOption: nextCorrect } })
+                            }}
+                            className="mt-6 text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     ))}
                     <div>
