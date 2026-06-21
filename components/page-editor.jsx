@@ -59,9 +59,6 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
     hintText: page.hintText || "",
     autoPlay: page.autoPlay || false,
     showGuide: page.showGuide ?? (normalizePageType(page.type) === "TRACE"),
-    question: page.question || "",
-    options: page.options || ["", ""],
-    correctOption: page.correctOption || 0,
     quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
   })
   const audioRef = useRef(null)
@@ -78,9 +75,6 @@ export default function PageEditor({ page, onSave, characters = [], lessonId }) 
       hintText: page.hintText || "",
       autoPlay: page.autoPlay || false,
       showGuide: page.showGuide ?? (normalized === "TRACE"),
-      question: page.question || "",
-      options: page.options || ["", ""],
-      correctOption: page.correctOption || 0,
       quizConfig: page.quizConfig || deriveQuizConfigFromPage(page),
     })
   }, [page.id])
